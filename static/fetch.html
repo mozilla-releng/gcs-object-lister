@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fetch View - GCS Storage Manager</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <nav>
+                <a href="/" class="btn-small">
+                    <i class="fas fa-arrow-left"></i> Back to Home
+                </a>
+            </nav>
+            <h1>Fetch Details</h1>
+            <p id="fetch-info">Loading fetch information...</p>
+        </header>
+
+        <main>
+            <!-- Error/Success Messages -->
+            <div id="message-area"></div>
+
+            <!-- Search and Controls -->
+            <section class="search-form">
+                <h2>Filter Objects</h2>
+                <form id="search-form">
+                    <div class="grid">
+                        <div>
+                            <label>Regex Filters <span id="filter-count">(0)</span></label>
+                            <div id="regex-filters-container">
+                                <div class="regex-filter-item">
+                                    <input type="text" class="regex-filter" placeholder="Enter regex pattern">
+                                    <button type="button" class="remove-filter hidden" onclick="removeRegexFilter(this)">×</button>
+                                </div>
+                            </div>
+                            <button type="button" id="add-filter-btn" onclick="addRegexFilter()">+ Add Filter</button>
+                            <button type="button" id="clear-filters-btn" onclick="clearAllFilters()" class="hidden">Clear All</button>
+                        </div>
+                        <div>
+                            <label for="sort">Sort Order</label>
+                            <select id="sort" name="sort">
+                                <option value="name_asc">Name (A-Z)</option>
+                                <option value="name_desc">Name (Z-A)</option>
+                                <option value="time_created_desc">Created (Newest First)</option>
+                                <option value="time_created_asc">Created (Oldest First)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid">
+                        <div>
+                            <label for="created_before">Created Before</label>
+                            <input type="datetime-local" id="created_before" name="created_before" placeholder="Filter by creation date">
+                        </div>
+                        <div>
+                            <label for="has_custom_time">Custom Time</label>
+                            <select id="has_custom_time" name="has_custom_time">
+                                <option value="">All Files</option>
+                                <option value="true">With Custom Time</option>
+                                <option value="false">Without Custom Time</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit">Apply Filter</button>
+                </form>
+                
+                <div class="mt-2">
+                    <button id="download-btn" onclick="downloadList()">
+                        <i class="fas fa-download"></i> Download File List
+                    </button>
+                </div>
+            </section>
+
+            <!-- Objects Table -->
+            <section>
+                <div id="objects-loading" class="text-center">
+                    <div class="spinner"></div> Loading objects...
+                </div>
+                
+                <div id="objects-container" class="hidden">
+                    <div class="pagination">
+                        <div class="pagination-info" id="pagination-info"></div>
+                        <div>
+                            <button id="prev-btn" onclick="goToPage(getCurrentPage() - 1)" disabled>
+                                <i class="fas fa-chevron-left"></i> Previous
+                            </button>
+                            <button id="next-btn" onclick="goToPage(getCurrentPage() + 1)" disabled>
+                                Next <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <table id="objects-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Size</th>
+                                    <th>Last Modified</th>
+                                    <th>Custom Time</th>
+                                </tr>
+                            </thead>
+                            <tbody id="objects-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="pagination">
+                        <div class="pagination-info" id="pagination-info-bottom"></div>
+                        <div>
+                            <button id="prev-btn-bottom" onclick="goToPage(getCurrentPage() - 1)" disabled>
+                                <i class="fas fa-chevron-left"></i> Previous
+                            </button>
+                            <button id="next-btn-bottom" onclick="goToPage(getCurrentPage() + 1)" disabled>
+                                Next <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="no-objects" class="text-center mt-3 hidden">
+                    <p>No objects found matching the current filter.</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script type="module" src="/static/js/api.js"></script>
+    <script type="module" src="/static/js/fetch.js"></script>
+</body>
+</html>

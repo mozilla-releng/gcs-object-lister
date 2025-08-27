@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GCS Storage Manager</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>GCS Storage Manager</h1>
+            <p>Manage and explore artifacts in Google Cloud Storage buckets</p>
+        </header>
+
+        <main>
+            <!-- Error/Success Messages -->
+            <div id="message-area"></div>
+
+            <!-- Fetch Controls -->
+            <section class="mb-3">
+                <h2>Start New Fetch</h2>
+                <form id="fetch-form">
+                    <div class="grid">
+                        <div>
+                            <label for="bucket">Bucket Name (optional)</label>
+                            <input type="text" id="bucket" name="bucket" placeholder="Leave empty to use default">
+                        </div>
+                        <div>
+                            <label for="prefix">Prefix (optional)</label>
+                            <input type="text" id="prefix" name="prefix" placeholder="Filter by prefix">
+                        </div>
+                    </div>
+                    <button type="submit" id="fetch-button">
+                        <span id="fetch-button-text">Fetch Current Files</span>
+                        <span id="fetch-spinner" class="spinner hidden"></span>
+                    </button>
+                </form>
+
+                <!-- Status Display -->
+                <div id="fetch-status" class="mt-2 hidden">
+                    <p class="status-running">
+                        <i class="fas fa-sync-alt fa-spin"></i>
+                        <span id="status-text">Starting fetch...</span>
+                    </p>
+                </div>
+            </section>
+
+            <!-- Historical Fetches -->
+            <section>
+                <h2>Available Fetches</h2>
+                <div id="fetches-loading" class="text-center">
+                    <div class="spinner"></div> Loading fetches...
+                </div>
+                <div id="fetches-container" class="hidden">
+                    <div class="table-container">
+                        <table id="fetches-table">
+                            <thead>
+                                <tr>
+                                    <th>Database Name</th>
+                                    <th>Bucket</th>
+                                    <th>Prefix</th>
+                                    <th>Started</th>
+                                    <th>Ended</th>
+                                    <th>Objects</th>
+                                    <th>DB Size</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fetches-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="no-fetches" class="text-center mt-3 hidden">
+                        <p>No fetches available. Start a new fetch to get started.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <dialog id="delete-modal">
+        <article>
+            <header>
+                <h3>Confirm Deletion</h3>
+            </header>
+            <p>Are you sure you want to delete the fetch <strong id="delete-fetch-name"></strong>?</p>
+            <p>This action cannot be undone.</p>
+            <footer>
+                <button class="secondary" onclick="closeDeleteModal()">Cancel</button>
+                <button onclick="confirmDelete()" id="confirm-delete-btn">Delete</button>
+            </footer>
+        </article>
+    </dialog>
+
+    <script type="module" src="/static/js/api.js"></script>
+    <script type="module" src="/static/js/index.js"></script>
+</body>
+</html>

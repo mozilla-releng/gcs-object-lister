@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - data:/data
+      # Mount Google Cloud credentials (adjust path for Windows: ${USERPROFILE}/.config/gcloud)
+      - ${HOME}/.config/gcloud:/root/.config/gcloud:ro
+    env_file: .env
+    restart: unless-stopped
+    environment:
+      - DATA_DIR=/data/fetches
+
+volumes:
+  data:
