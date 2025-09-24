@@ -148,6 +148,9 @@ class FetchManager:
                     self.db_manager.insert_objects_batch(db_name, batch)
                     batch = []
 
+                    # Update record count in database for live progress
+                    self.db_manager.update_fetch_status(db_name, "running", record_count=processed_count)
+
                     # Log progress
                     elapsed = time.time() - start_time
                     rate = processed_count / elapsed if elapsed > 0 else 0

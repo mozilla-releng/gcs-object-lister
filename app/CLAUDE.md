@@ -5,18 +5,26 @@ This directory contains the Python Flask backend for the GCS Storage Manager.
 ## Structure
 
 - **`main.py`** - Flask application factory and entry point with configuration loading
-- **`api.py`** - REST API routes and JSON response handling using orjson
-- **`db.py`** - SQLite database management, schema creation, and data operations
-- **`fetcher.py`** - Background fetch orchestration with thread management and locking
-- **`gcs.py`** - Google Cloud Storage client wrapper for object listing and metadata
+- **`api.py`** - REST API routes and JSON response handling (multiple regex filters support)
+- **`db.py`** - SQLite database management with REGEXP function, optimized indexes, and size tracking
+- **`fetcher.py`** - Background fetch orchestration with live progress updates and size calculation
 - **`utils.py`** - Utility functions for formatting, validation, and data transformation
 
 ## Architecture
 
 Modular Python design with clear separation of concerns:
 - Single-threaded Flask app with background fetch threads
-- SQLite per-fetch databases for data isolation
+- SQLite per-fetch databases for data isolation with optimized performance
 - File-based locking to prevent concurrent fetches
+- Custom SQLite REGEXP function for database-level regex filtering
 - ADC authentication for GCS access
 
-Dependencies are minimal: Flask, google-cloud-storage, orjson, and built-in sqlite3.
+## Key Implementation Details
+
+- **Database Performance**: Custom REGEXP function, multiple indexes, SQL-based filtering/pagination
+- **Live Progress**: Record count updates every 1000 objects during fetch
+- **Size Management**: Database size calculation and storage in metadata table
+- **Memory Efficiency**: Removed raw object metadata storage to reduce database size
+- **Filter Support**: Multiple regex patterns with OR logic, date filters, custom_time filters
+
+Dependencies are minimal: Flask, google-cloud-storage, and built-in sqlite3.

@@ -121,7 +121,7 @@ function updateStatusDisplay(status) {
         
         let message = status.message || 'Fetch in progress...';
         if (status.processed) {
-            message += ` (${status.processed.toLocaleString()} objects processed)`;
+            message += ` - ${status.processed.toLocaleString()} objects fetched`;
         }
         
         statusText.textContent = message;
