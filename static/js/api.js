@@ -82,6 +82,11 @@ class APIClient {
                 params.append('regex_filters[]', filter);
             });
         }
+        if (options.manifest_patterns) {
+            options.manifest_patterns.forEach(pattern => {
+                params.append('manifest_patterns[]', pattern);
+            });
+        }
         if (options.page) params.append('page', options.page);
         if (options.pageSize) params.append('page_size', options.pageSize);
         if (options.sort) params.append('sort', options.sort);
@@ -102,6 +107,11 @@ class APIClient {
         if (options.regex_filters) {
             options.regex_filters.forEach(filter => {
                 params.append('regex_filters[]', filter);
+            });
+        }
+        if (options.manifest_patterns) {
+            options.manifest_patterns.forEach(pattern => {
+                params.append('manifest_patterns[]', pattern);
             });
         }
         if (options.created_before) params.append('created_before', options.created_before);

@@ -24,9 +24,17 @@ External dependencies loaded via CDN:
 
 - **Live Progress**: Real-time object count updates during fetch (every 2 seconds polling)
 - **Multiple Regex Filters**: Dynamic UI for adding/removing regex patterns with OR logic
+- **Manifest Filtering**: URL-based manifest loading with automatic pattern generation and status feedback
 - **Enhanced Filters**: Date range filtering and custom_time presence filtering
 - **Database Size Display**: Shows calculated database size on landing page
 - **Sort Options**: Name and time_created sorting (ascending/descending)
-- **Responsive Design**: Clean, accessible interface that works on all devices
+- **Responsive Design**: Clean, accessible interface with fieldset organization
+
+## Manifest Integration
+
+- **URL Input**: Users can enter Firefox manifest URLs for automatic pattern generation
+- **Status Display**: Real-time feedback during manifest loading with success/error states
+- **Pattern Combination**: Seamlessly combines manifest patterns with custom regex filters
+- **Clear Functionality**: Easy manifest clearing and filter management
 
 All JavaScript uses modern ES6+ features and module imports for clean separation of concerns.

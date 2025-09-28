@@ -191,3 +191,79 @@
     border-color: #dc3545;
     background-color: #f8d7da;
 }
+
+/* Manifest filtering styles */
+.manifest-success {
+    color: var(--primary, #007bff);
+    font-weight: 500;
+}
+
+.manifest-error {
+    color: #dc3545;
+    font-weight: 500;
+}
+
+#manifest-status {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+}
+
+fieldset {
+    margin-bottom: 1rem;
+}
+
+legend {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+/* Manifest patterns display */
+#manifest-patterns {
+    margin-top: 1rem;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    border-radius: 0.25rem;
+    border: 1px solid #e9ecef;
+}
+
+#manifest-patterns h4 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    color: #495057;
+}
+
+.patterns-container {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: 0.5rem;
+}
+
+.pattern-item {
+    padding: 0.25rem 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.pattern-item:last-child {
+    border-bottom: none;
+}
+
+.pattern-code {
+    font-size: 0.8em;
+    color: #6f42c1;
+    background-color: #f8f9fa;
+    padding: 0.1rem 0.3rem;
+    border-radius: 0.2rem;
+    word-break: break-all;
+}
+
+details summary {
+    cursor: pointer;
+    font-weight: 500;
+    color: #007bff;
+    margin-bottom: 0.5rem;
+}
+
+details summary:hover {
+    color: #0056b3;
+}

@@ -9,6 +9,7 @@ let currentFilters = [];
 let currentSort = 'name_asc';
 let currentCreatedBefore = '';
 let currentHasCustomTime = '';
+let currentManifestPatterns = [];
 let totalObjects = 0;
 let dbName = '';
 
@@ -33,6 +34,10 @@ function setupEventListeners() {
     window.addRegexFilter = addRegexFilter;
     window.removeRegexFilter = removeRegexFilter;
     window.clearAllFilters = clearAllFilters;
+
+    // Make manifest filter functions global
+    window.loadManifest = loadManifest;
+    window.clearManifest = clearManifest;
     
     // Initialize filter UI
     updateFilterCount();
@@ -157,11 +162,15 @@ async function loadObjects() {
         if (currentFilters.length > 0) {
             options.regex_filters = currentFilters;
         }
-        
+
+        if (currentManifestPatterns.length > 0) {
+            options.manifest_patterns = currentManifestPatterns;
+        }
+
         if (currentCreatedBefore) {
             options.created_before = currentCreatedBefore;
         }
-        
+
         if (currentHasCustomTime) {
             options.has_custom_time = currentHasCustomTime;
         }
@@ -270,6 +279,9 @@ async function downloadList() {
         const options = {};
         if (currentFilters.length > 0) {
             options.regex_filters = currentFilters;
+        }
+        if (currentManifestPatterns.length > 0) {
+            options.manifest_patterns = currentManifestPatterns;
         }
         if (currentCreatedBefore) {
             options.created_before = currentCreatedBefore;
@@ -388,4 +400,115 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+async function loadManifest() {
+    const manifestUrlInput = document.getElementById('manifest-url');
+    const loadBtn = document.getElementById('load-manifest-btn');
+    const clearBtn = document.getElementById('clear-manifest-btn');
+    const statusDiv = document.getElementById('manifest-status');
+    const statusText = document.getElementById('manifest-status-text');
+
+    const manifestUrl = manifestUrlInput.value.trim();
+    if (!manifestUrl) {
+        showMessage('error', 'Please enter a manifest URL');
+        return;
+    }
+
+    const originalText = loadBtn.textContent;
+
+    try {
+        loadBtn.disabled = true;
+        loadBtn.textContent = 'Loading...';
+        statusDiv.classList.add('hidden');
+
+        const response = await fetch('/api/manifest/parse', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: manifestUrl })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.details || `HTTP ${response.status}`);
+        }
+
+        if (data.patterns) {
+            currentManifestPatterns = data.patterns;
+
+            // Show success status
+            statusDiv.classList.remove('hidden');
+            statusText.textContent = data.message;
+            statusText.className = 'manifest-success';
+
+            // Show and populate patterns list
+            displayManifestPatterns(data.patterns);
+
+            // Show clear button
+            clearBtn.classList.remove('hidden');
+
+            // Reload objects with manifest filters
+            currentPage = 1;
+            loadObjects();
+
+            showMessage('success', `Manifest loaded with ${data.patterns.length} patterns`);
+        } else {
+            throw new Error(data.details || 'Failed to parse manifest');
+        }
+
+    } catch (error) {
+        statusDiv.classList.remove('hidden');
+        statusText.textContent = `Error: ${error.message || error.details || 'Failed to load manifest'}`;
+        statusText.className = 'manifest-error';
+        showMessage('error', `Failed to load manifest: ${error.message || error.details}`);
+    } finally {
+        loadBtn.disabled = false;
+        loadBtn.textContent = originalText;
+    }
+}
+
+function clearManifest() {
+    currentManifestPatterns = [];
+
+    // Clear UI
+    document.getElementById('manifest-url').value = '';
+    document.getElementById('manifest-status').classList.add('hidden');
+    document.getElementById('manifest-patterns').classList.add('hidden');
+    document.getElementById('clear-manifest-btn').classList.add('hidden');
+
+    // Reload objects without manifest filters
+    currentPage = 1;
+    loadObjects();
+
+    showMessage('success', 'Manifest filter cleared');
+}
+
+function displayManifestPatterns(patterns) {
+    const patternsDiv = document.getElementById('manifest-patterns');
+    const patternsList = document.getElementById('manifest-patterns-list');
+
+    // Clear existing patterns
+    patternsList.innerHTML = '';
+
+    // Create a collapsible list of patterns
+    const summary = document.createElement('details');
+    summary.innerHTML = `
+        <summary>Show ${patterns.length} patterns</summary>
+        <div class="patterns-container"></div>
+    `;
+
+    const container = summary.querySelector('.patterns-container');
+
+    patterns.forEach((pattern, index) => {
+        const patternItem = document.createElement('div');
+        patternItem.className = 'pattern-item';
+        patternItem.innerHTML = `
+            <code class="pattern-code">${escapeHtml(pattern)}</code>
+        `;
+        container.appendChild(patternItem);
+    });
+
+    patternsList.appendChild(summary);
+    patternsDiv.classList.remove('hidden');
 }

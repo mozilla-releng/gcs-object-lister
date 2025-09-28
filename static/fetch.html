@@ -28,42 +28,68 @@
             <section class="search-form">
                 <h2>Filter Objects</h2>
                 <form id="search-form">
-                    <div class="grid">
-                        <div>
-                            <label>Regex Filters <span id="filter-count">(0)</span></label>
-                            <div id="regex-filters-container">
-                                <div class="regex-filter-item">
-                                    <input type="text" class="regex-filter" placeholder="Enter regex pattern">
-                                    <button type="button" class="remove-filter hidden" onclick="removeRegexFilter(this)">×</button>
-                                </div>
+                    <!-- Manifest Filtering Section -->
+                    <fieldset>
+                        <legend>Manifest Filtering</legend>
+                        <div class="grid">
+                            <div>
+                                <label for="manifest-url">Manifest URL</label>
+                                <input type="url" id="manifest-url" name="manifest_url" placeholder="https://example.com/manifest.yml">
                             </div>
-                            <button type="button" id="add-filter-btn" onclick="addRegexFilter()">+ Add Filter</button>
-                            <button type="button" id="clear-filters-btn" onclick="clearAllFilters()" class="hidden">Clear All</button>
+                            <div style="display: flex; gap: 0.5rem; align-items: end;">
+                                <button type="button" id="load-manifest-btn" onclick="loadManifest()">Load Manifest</button>
+                                <button type="button" id="clear-manifest-btn" onclick="clearManifest()" class="secondary hidden">Clear</button>
+                            </div>
                         </div>
-                        <div>
-                            <label for="sort">Sort Order</label>
-                            <select id="sort" name="sort">
-                                <option value="name_asc">Name (A-Z)</option>
-                                <option value="name_desc">Name (Z-A)</option>
-                                <option value="time_created_desc">Created (Newest First)</option>
-                                <option value="time_created_asc">Created (Oldest First)</option>
-                            </select>
+                        <div id="manifest-status" class="hidden">
+                            <p id="manifest-status-text"></p>
                         </div>
-                    </div>
-                    <div class="grid">
-                        <div>
-                            <label for="created_before">Created Before</label>
-                            <input type="datetime-local" id="created_before" name="created_before" placeholder="Filter by creation date">
+                        <div id="manifest-patterns" class="hidden">
+                            <h4>Loaded Manifest Patterns</h4>
+                            <div id="manifest-patterns-list"></div>
                         </div>
-                        <div>
-                            <label for="has_custom_time">Custom Time</label>
-                            <select id="has_custom_time" name="has_custom_time">
-                                <option value="">All Files</option>
-                                <option value="true">With Custom Time</option>
-                                <option value="false">Without Custom Time</option>
-                            </select>
+                    </fieldset>
+
+                    <!-- Custom Filtering Section -->
+                    <fieldset>
+                        <legend>Custom Filtering</legend>
+                        <div class="grid">
+                            <div>
+                                <label>Regex Filters <span id="filter-count">(0)</span></label>
+                                <div id="regex-filters-container">
+                                    <div class="regex-filter-item">
+                                        <input type="text" class="regex-filter" placeholder="Enter regex pattern">
+                                        <button type="button" class="remove-filter hidden" onclick="removeRegexFilter(this)">×</button>
+                                    </div>
+                                </div>
+                                <button type="button" id="add-filter-btn" onclick="addRegexFilter()">+ Add Filter</button>
+                                <button type="button" id="clear-filters-btn" onclick="clearAllFilters()" class="secondary hidden">Clear All</button>
+                            </div>
+                            <div>
+                                <label for="sort">Sort Order</label>
+                                <select id="sort" name="sort">
+                                    <option value="name_asc">Name (A-Z)</option>
+                                    <option value="name_desc">Name (Z-A)</option>
+                                    <option value="time_created_desc">Created (Newest First)</option>
+                                    <option value="time_created_asc">Created (Oldest First)</option>
+                                </select>
+                            </div>
                         </div>
-                    </div>
+                        <div class="grid">
+                            <div>
+                                <label for="created_before">Created Before</label>
+                                <input type="datetime-local" id="created_before" name="created_before" placeholder="Filter by creation date">
+                            </div>
+                            <div>
+                                <label for="has_custom_time">Custom Time</label>
+                                <select id="has_custom_time" name="has_custom_time">
+                                    <option value="">All Files</option>
+                                    <option value="true">With Custom Time</option>
+                                    <option value="false">Without Custom Time</option>
+                                </select>
+                            </div>
+                        </div>
+                    </fieldset>
                     <button type="submit">Apply Filter</button>
                 </form>
                 
