@@ -68,7 +68,7 @@ def create_app():
     def not_found(error):
         """Handle 404 errors."""
         if request.path.startswith('/api/'):
-            from .api import orjson_response
+            from .api.utils import orjson_response
             return orjson_response({"error": "not_found", "details": "Endpoint not found"}, 404)
         return "Page not found", 404
 
@@ -77,7 +77,7 @@ def create_app():
         """Handle 500 errors."""
         logger.error(f"Internal error: {error}")
         if request.path.startswith('/api/'):
-            from .api import orjson_response
+            from .api.utils import orjson_response
             return orjson_response({"error": "internal_error", "details": "Internal server error"}, 500)
         return "Internal server error", 500
 

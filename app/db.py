@@ -5,7 +5,7 @@ import sqlite3
 import logging
 import re
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 
 from .utils import format_timestamp, safe_db_name
@@ -62,7 +62,29 @@ class DatabaseManager:
                     size INTEGER NOT NULL,
                     updated TEXT NOT NULL,
                     time_created TEXT,
-                    custom_time TEXT
+                    custom_time TEXT,
+                    manifest_entry_id INTEGER,
+                    FOREIGN KEY (manifest_entry_id) REFERENCES manifest_entries (id)
+                )
+            """)
+
+            conn.execute("""
+                CREATE TABLE manifest (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    url TEXT NOT NULL,
+                    hash TEXT NOT NULL,
+                    date_added TEXT NOT NULL,
+                    pattern_count INTEGER DEFAULT 0
+                )
+            """)
+
+            conn.execute("""
+                CREATE TABLE manifest_entries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    mapping_key TEXT NOT NULL,
+                    pretty_name TEXT NOT NULL,
+                    destination TEXT NOT NULL,
+                    regex_pattern TEXT NOT NULL
                 )
             """)
 
@@ -70,10 +92,14 @@ class DatabaseManager:
             conn.execute("CREATE INDEX idx_objects_name ON objects(name)")
             conn.execute("CREATE INDEX idx_objects_time_created ON objects(time_created)")
             conn.execute("CREATE INDEX idx_objects_custom_time ON objects(custom_time)")
-            
+            conn.execute("CREATE INDEX idx_objects_manifest_entry_id ON objects(manifest_entry_id)")
+
             # Composite indexes for common query patterns
             conn.execute("CREATE INDEX idx_objects_time_created_name ON objects(time_created, name)")
             conn.execute("CREATE INDEX idx_objects_custom_time_name ON objects(custom_time, name)")
+
+            # Manifest table indexes
+            conn.execute("CREATE INDEX idx_manifest_entries_id ON manifest_entries(id)")
 
             # Insert initial fetch record
             conn.execute("""
@@ -224,7 +250,9 @@ class DatabaseManager:
     def get_objects_page(self, db_name: str, page: int = 1, page_size: int = 200,
                         regex_filter: Optional[str] = None, sort: str = "name_asc",
                         created_before: Optional[str] = None, has_custom_time: Optional[str] = None,
-                        regex_filters: Optional[List[str]] = None) -> Dict[str, Any]:
+                        regex_filters: Optional[List[str]] = None,
+                        use_manifest_filtering: bool = False,
+                        exclude_manifest_matches: bool = False) -> Dict[str, Any]:
         """Get paginated objects with optional filtering."""
         db_path = self.get_db_path(db_name)
         offset = (page - 1) * page_size
@@ -232,20 +260,33 @@ class DatabaseManager:
         # Build WHERE clause conditions
         where_conditions = []
         params = []
+        from_clause = "objects"
+        join_clause = ""
 
-        # Handle regex filters with OR logic
-        all_regex_patterns = []
-        if regex_filter:
-            all_regex_patterns.append(regex_filter)
-        if regex_filters:
-            all_regex_patterns.extend([f for f in regex_filters if f])
+        # Determine filtering strategy
+        if use_manifest_filtering:
+            # Use manifest-based filtering (fast JOIN approach)
+            from_clause = "objects o"
+            join_clause = "JOIN manifest_entries me ON o.manifest_entry_id = me.id"
+            # Filter is handled by the JOIN, so only objects with manifest_entry_id will be included
+        elif exclude_manifest_matches:
+            # Filter out objects that match manifest
+            from_clause = "objects"
+            where_conditions.append("manifest_entry_id IS NULL")
+        else:
+            # Handle regex filters with OR logic (slower REGEXP approach)
+            all_regex_patterns = []
+            if regex_filter:
+                all_regex_patterns.append(regex_filter)
+            if regex_filters:
+                all_regex_patterns.extend([f for f in regex_filters if f])
 
-        if all_regex_patterns:
-            regex_conditions = []
-            for pattern in all_regex_patterns:
-                regex_conditions.append("name REGEXP ?")
-                params.append(pattern)
-            where_conditions.append(f"({' OR '.join(regex_conditions)})")
+            if all_regex_patterns:
+                regex_conditions = []
+                for pattern in all_regex_patterns:
+                    regex_conditions.append("name REGEXP ?")
+                    params.append(pattern)
+                where_conditions.append(f"({' OR '.join(regex_conditions)})")
 
         # Date filter (created before)
         if created_before:
@@ -260,32 +301,48 @@ class DatabaseManager:
             else:
                 where_conditions.append("custom_time IS NULL")
 
-        # Build ORDER BY clause
+        # Build ORDER BY clause - adjust for table alias if using JOIN
+        table_prefix = "o." if use_manifest_filtering else ""
         if sort == "name_desc":
-            order_by = "ORDER BY name DESC"
+            order_by = f"ORDER BY {table_prefix}name DESC"
         elif sort == "time_created_desc":
-            order_by = "ORDER BY time_created DESC"
+            order_by = f"ORDER BY {table_prefix}time_created DESC"
         elif sort == "time_created_asc":
-            order_by = "ORDER BY time_created ASC"
+            order_by = f"ORDER BY {table_prefix}time_created ASC"
         else:  # name_asc
-            order_by = "ORDER BY name ASC"
+            order_by = f"ORDER BY {table_prefix}name ASC"
 
         # Build complete WHERE clause
         where_clause = f"WHERE {' AND '.join(where_conditions)}" if where_conditions else ""
 
         with self.get_connection(db_path) as conn:
             # Get total count
-            count_query = f"SELECT COUNT(*) FROM objects {where_clause}"
+            if use_manifest_filtering:
+                count_query = f"SELECT COUNT(*) FROM {from_clause} {join_clause} {where_clause}"
+            else:
+                count_query = f"SELECT COUNT(*) FROM {from_clause} {where_clause}"
+
             total = conn.execute(count_query, params).fetchone()[0]
 
             # Get paginated results
-            data_query = f"""
-                SELECT name, size, updated, time_created, custom_time
-                FROM objects
-                {where_clause}
-                {order_by}
-                LIMIT ? OFFSET ?
-            """
+            if use_manifest_filtering:
+                data_query = f"""
+                    SELECT o.name, o.size, o.updated, o.time_created, o.custom_time, o.manifest_entry_id
+                    FROM {from_clause}
+                    {join_clause}
+                    {where_clause}
+                    {order_by}
+                    LIMIT ? OFFSET ?
+                """
+            else:
+                data_query = f"""
+                    SELECT name, size, updated, time_created, custom_time, manifest_entry_id
+                    FROM {from_clause}
+                    {where_clause}
+                    {order_by}
+                    LIMIT ? OFFSET ?
+                """
+
             data_params = params + [page_size, offset]
             logger.info(f"Executing query: {data_query} with params: {data_params}")
             rows = conn.execute(data_query, data_params).fetchall()
@@ -298,7 +355,8 @@ class DatabaseManager:
                     "size": row["size"],
                     "updated": row["updated"],
                     "time_created": row["time_created"],
-                    "custom_time": row["custom_time"]
+                    "custom_time": row["custom_time"],
+                    "manifest_entry_id": row["manifest_entry_id"]
                 })
 
         return {
@@ -310,52 +368,340 @@ class DatabaseManager:
 
     def get_object_names_filtered(self, db_name: str, regex_filter: Optional[str] = None,
                                  created_before: Optional[str] = None, has_custom_time: Optional[str] = None,
-                                 regex_filters: Optional[List[str]] = None) -> List[str]:
+                                 regex_filters: Optional[List[str]] = None,
+                                 use_manifest_filtering: bool = False,
+                                 exclude_manifest_matches: bool = False) -> List[str]:
         """Get all object names with optional filtering for download."""
         db_path = self.get_db_path(db_name)
 
         # Build WHERE clause conditions
         where_conditions = []
         params = []
+        from_clause = "objects"
+        join_clause = ""
 
-        # Handle regex filters with OR logic
-        all_regex_patterns = []
-        if regex_filter:
-            all_regex_patterns.append(regex_filter)
-        if regex_filters:
-            all_regex_patterns.extend([f for f in regex_filters if f])
+        # Determine filtering strategy
+        if use_manifest_filtering:
+            # Use manifest-based filtering (fast JOIN approach)
+            from_clause = "objects o"
+            join_clause = "JOIN manifest_entries me ON o.manifest_entry_id = me.id"
+        elif exclude_manifest_matches:
+            # Filter out objects that match manifest
+            from_clause = "objects"
+            where_conditions.append("manifest_entry_id IS NULL")
+        else:
+            # Handle regex filters with OR logic (slower REGEXP approach)
+            all_regex_patterns = []
+            if regex_filter:
+                all_regex_patterns.append(regex_filter)
+            if regex_filters:
+                all_regex_patterns.extend([f for f in regex_filters if f])
 
-        if all_regex_patterns:
-            regex_conditions = []
-            for pattern in all_regex_patterns:
-                regex_conditions.append("name REGEXP ?")
-                params.append(pattern)
-            where_conditions.append(f"({' OR '.join(regex_conditions)})")
+            if all_regex_patterns:
+                regex_conditions = []
+                for pattern in all_regex_patterns:
+                    regex_conditions.append("name REGEXP ?")
+                    params.append(pattern)
+                where_conditions.append(f"({' OR '.join(regex_conditions)})")
 
-        # Date filter (created before)
+        # Date filter (created before) - adjust for table alias
+        table_prefix = "o." if use_manifest_filtering else ""
         if created_before:
-            where_conditions.append("time_created < ?")
+            where_conditions.append(f"{table_prefix}time_created < ?")
             params.append(created_before)
 
         # Custom time filter
         if has_custom_time:
             filter_value = has_custom_time.lower() in ['true', 'yes']
             if filter_value:
-                where_conditions.append("custom_time IS NOT NULL")
+                where_conditions.append(f"{table_prefix}custom_time IS NOT NULL")
             else:
-                where_conditions.append("custom_time IS NULL")
+                where_conditions.append(f"{table_prefix}custom_time IS NULL")
 
         # Build complete WHERE clause
         where_clause = f"WHERE {' AND '.join(where_conditions)}" if where_conditions else ""
 
         with self.get_connection(db_path) as conn:
-            query = f"SELECT name FROM objects {where_clause} ORDER BY name ASC"
+            if use_manifest_filtering:
+                query = f"SELECT o.name FROM {from_clause} {join_clause} {where_clause} ORDER BY o.name ASC"
+            else:
+                query = f"SELECT name FROM {from_clause} {where_clause} ORDER BY name ASC"
+
             logger.info(f"Executing query: {query} with params: {params}")
             rows = conn.execute(query, params).fetchall()
 
             response = [row["name"] for row in rows]
-        logger.info(f"Fetched object names: {response}")
         return response
+
+    def get_current_manifest(self, db_name: str) -> Optional[Dict[str, Any]]:
+        """Get the current manifest record if it exists."""
+        if not safe_db_name(db_name):
+            return None
+
+        db_path = self.get_db_path(db_name)
+        if not os.path.exists(db_path):
+            return None
+
+        try:
+            with self.get_connection(db_path) as conn:
+                # Check if manifest table exists (for migration compatibility)
+                tables = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='manifest'"
+                ).fetchall()
+
+                if not tables:
+                    return None
+
+                # Trigger migration to ensure status column exists
+                self._ensure_manifest_tables_exist(conn)
+
+                row = conn.execute("SELECT * FROM manifest WHERE id = 1").fetchone()
+                if row:
+                    # Check if status column exists (migration compatibility)
+                    try:
+                        status = row["status"]
+                    except (KeyError, IndexError):
+                        status = "idle"
+
+                    return {
+                        "url": row["url"],
+                        "hash": row["hash"],
+                        "date_added": row["date_added"],
+                        "pattern_count": row["pattern_count"],
+                        "status": status
+                    }
+        except Exception as e:
+            logger.warning(f"Failed to read manifest from {db_name}: {e}")
+
+        return None
+
+    def store_manifest(self, db_name: str, url: str, manifest_hash: str, patterns: List[Dict[str, str]]):
+        """Store or replace manifest data. Clear existing entries if hash differs."""
+        db_path = self.get_db_path(db_name)
+
+        with self.get_connection(db_path) as conn:
+            # Check if tables exist (for migration compatibility)
+            self._ensure_manifest_tables_exist(conn)
+
+            # Get current manifest
+            current = conn.execute("SELECT hash FROM manifest WHERE id = 1").fetchone()
+            current_hash = current["hash"] if current else None
+
+            # If hash differs, clear all existing data
+            if current_hash != manifest_hash:
+                logger.info(f"Manifest hash changed for {db_name}, clearing existing data")
+
+                # Clear all manifest links from objects
+                conn.execute("UPDATE objects SET manifest_entry_id = NULL")
+
+                # Delete all manifest entries
+                conn.execute("DELETE FROM manifest_entries")
+
+                # Replace manifest record
+                conn.execute("""
+                    INSERT OR REPLACE INTO manifest (id, url, hash, date_added, pattern_count, status)
+                    VALUES (1, ?, ?, ?, ?, 'idle')
+                """, (url, manifest_hash, format_timestamp(datetime.now(timezone.utc)), len(patterns)))
+
+                # Insert new manifest entries
+                for i, pattern_data in enumerate(patterns):
+                    logger.info(f"Storing manifest entry {i+1}: {pattern_data}")
+                    conn.execute("""
+                        INSERT INTO manifest_entries (mapping_key, pretty_name, destination, regex_pattern)
+                        VALUES (?, ?, ?, ?)
+                    """, (
+                        pattern_data.get('mapping_key', ''),
+                        pattern_data.get('pretty_name', ''),
+                        pattern_data.get('destination', ''),
+                        pattern_data.get('regex_pattern', '')
+                    ))
+
+                conn.commit()
+                logger.info(f"Stored {len(patterns)} manifest patterns for {db_name}")
+
+                # Log what was actually stored
+                stored_entries = conn.execute("SELECT id, pretty_name, regex_pattern FROM manifest_entries").fetchall()
+                logger.info(f"Verified {len(stored_entries)} entries in database:")
+                for entry in stored_entries:
+                    logger.info(f"  ID {entry['id']}: {entry['pretty_name']} -> {entry['regex_pattern']}")
+
+    def clear_manifest_links(self, db_name: str):
+        """Clear all manifest_entry_id links from objects table."""
+        db_path = self.get_db_path(db_name)
+
+        with self.get_connection(db_path) as conn:
+            conn.execute("UPDATE objects SET manifest_entry_id = NULL")
+            conn.commit()
+
+    def get_manifest_entries(self, db_name: str) -> List[Dict[str, Any]]:
+        """Get all manifest entries for this database."""
+        db_path = self.get_db_path(db_name)
+
+        with self.get_connection(db_path) as conn:
+            # Check if manifest_entries table exists
+            tables = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='manifest_entries'"
+            ).fetchall()
+
+            if not tables:
+                return []
+
+            rows = conn.execute("""
+                SELECT id, mapping_key, pretty_name, destination, regex_pattern
+                FROM manifest_entries
+                ORDER BY id
+            """).fetchall()
+
+            return [
+                {
+                    "id": row["id"],
+                    "mapping_key": row["mapping_key"],
+                    "pretty_name": row["pretty_name"],
+                    "destination": row["destination"],
+                    "regex_pattern": row["regex_pattern"]
+                }
+                for row in rows
+            ]
+
+    def _ensure_manifest_tables_exist(self, conn):
+        """Ensure manifest tables exist for migration compatibility."""
+        # Check if manifest table exists
+        tables = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='manifest'"
+        ).fetchall()
+
+        if not tables:
+            # Create manifest tables
+            conn.execute("""
+                CREATE TABLE manifest (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    url TEXT NOT NULL,
+                    hash TEXT NOT NULL,
+                    date_added TEXT NOT NULL,
+                    pattern_count INTEGER DEFAULT 0,
+                    status TEXT DEFAULT 'idle'
+                )
+            """)
+
+            conn.execute("""
+                CREATE TABLE manifest_entries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    mapping_key TEXT NOT NULL,
+                    pretty_name TEXT NOT NULL,
+                    destination TEXT NOT NULL,
+                    regex_pattern TEXT NOT NULL
+                )
+            """)
+
+            # Add manifest_entry_id column to objects if it doesn't exist
+            try:
+                conn.execute("ALTER TABLE objects ADD COLUMN manifest_entry_id INTEGER")
+            except Exception:
+                # Column might already exist
+                pass
+
+            # Create indexes
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_objects_manifest_entry_id ON objects(manifest_entry_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_manifest_entries_id ON manifest_entries(id)")
+
+            conn.commit()
+        else:
+            # Migration for existing databases - add status column if it doesn't exist
+            try:
+                conn.execute("ALTER TABLE manifest ADD COLUMN status TEXT DEFAULT 'idle'")
+                conn.commit()
+                logger.info(f"Added status column to existing manifest table")
+            except Exception:
+                # Column might already exist
+                pass
+
+    def update_manifest_status(self, db_name: str, status: str):
+        """Update manifest processing status."""
+        db_path = self.get_db_path(db_name)
+
+        with self.get_connection(db_path) as conn:
+            self._ensure_manifest_tables_exist(conn)
+            conn.execute("UPDATE manifest SET status = ? WHERE id = 1", (status,))
+            conn.commit()
+            logger.info(f"Updated manifest status to: {status}")
+
+    def link_objects_to_manifest_entries(self, db_name: str):
+        """Link objects to manifest entries by matching regex patterns."""
+        db_path = self.get_db_path(db_name)
+
+        with self.get_connection(db_path) as conn:
+            # First, check if manifest tables exist and ensure migration
+            self._ensure_manifest_tables_exist(conn)
+
+            # Set status to processing
+            conn.execute("UPDATE manifest SET status = 'processing' WHERE id = 1")
+            conn.commit()
+
+            # Get all manifest entries
+            entries = conn.execute("""
+                SELECT id, regex_pattern, pretty_name
+                FROM manifest_entries
+                ORDER BY id
+            """).fetchall()
+
+            if not entries:
+                logger.info(f"No manifest entries found for {db_name}")
+                return {"total_objects": 0, "linked_objects": 0}
+
+            logger.info(f"Found {len(entries)} manifest entries to process for {db_name}")
+
+            updated_count = 0
+
+            # For each manifest entry, update objects that match the regex pattern
+            for entry in entries:
+                entry_id = entry["id"]
+                pattern = entry["regex_pattern"]
+                pretty_name = entry["pretty_name"]
+
+                logger.info(f"Processing manifest entry {entry_id} ('{pretty_name}') with pattern: {pattern}")
+
+                try:
+                    # Update objects that match this pattern and don't already have a manifest_entry_id
+                    result = conn.execute("""
+                        UPDATE objects
+                        SET manifest_entry_id = ?
+                        WHERE name REGEXP ? AND manifest_entry_id IS NULL
+                    """, (entry_id, pattern))
+
+                    matches_count = result.rowcount
+                    updated_count += matches_count
+                    logger.info(f"Pattern '{pattern}' matched and linked {matches_count} objects")
+
+                    # Log some sample matches for debugging (optional)
+                    if matches_count > 0:
+                        sample_matches = conn.execute("""
+                            SELECT name FROM objects
+                            WHERE manifest_entry_id = ?
+                            LIMIT 3
+                        """, (entry_id,)).fetchall()
+
+                        for i, match in enumerate(sample_matches):
+                            logger.info(f"  Sample match {i+1}: {match['name']}")
+                        if matches_count > 3:
+                            logger.info(f"  ... and {matches_count - 3} more objects")
+
+                except Exception as e:
+                    logger.warning(f"Failed to process pattern {pattern}: {e}")
+                    continue
+
+            conn.commit()
+            logger.info(f"Successfully linked {updated_count} objects to manifest entries for {db_name}")
+
+            # Set status back to idle when complete
+            conn.execute("UPDATE manifest SET status = 'idle' WHERE id = 1")
+            conn.commit()
+
+            # Return statistics
+            total_objects = conn.execute("SELECT COUNT(*) FROM objects").fetchone()[0]
+            linked_objects = conn.execute("SELECT COUNT(*) FROM objects WHERE manifest_entry_id IS NOT NULL").fetchone()[0]
+
+            logger.info(f"Manifest linking complete: {linked_objects}/{total_objects} objects linked")
+            return {"total_objects": total_objects, "linked_objects": linked_objects}
 
     def delete_fetch(self, db_name: str) -> bool:
         """Delete a fetch database file."""

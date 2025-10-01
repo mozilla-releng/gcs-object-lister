@@ -38,11 +38,15 @@
                             </div>
                             <div style="display: flex; gap: 0.5rem; align-items: end;">
                                 <button type="button" id="load-manifest-btn" onclick="loadManifest()">Load Manifest</button>
+                                <button type="button" id="recalculate-manifest-btn" onclick="recalculateManifest()" class="secondary hidden">Recalculate</button>
                                 <button type="button" id="clear-manifest-btn" onclick="clearManifest()" class="secondary hidden">Clear</button>
                             </div>
                         </div>
                         <div id="manifest-status" class="hidden">
                             <p id="manifest-status-text"></p>
+                        </div>
+                        <div id="manifest-entries" class="hidden">
+                            <!-- Manifest entries will be populated here -->
                         </div>
                         <div id="manifest-patterns" class="hidden">
                             <h4>Loaded Manifest Patterns</h4>
@@ -89,6 +93,19 @@
                                 </select>
                             </div>
                         </div>
+                        <div class="grid">
+                            <div>
+                                <label for="matches_manifest">Matches Manifest</label>
+                                <select id="matches_manifest" name="matches_manifest">
+                                    <option value="">All Files</option>
+                                    <option value="true">Matches Manifest</option>
+                                    <option value="false">Does Not Match Manifest</option>
+                                </select>
+                            </div>
+                            <div>
+                                <!-- Empty div for grid layout -->
+                            </div>
+                        </div>
                     </fieldset>
                     <button type="submit">Apply Filter</button>
                 </form>
@@ -127,6 +144,7 @@
                                     <th>Size</th>
                                     <th>Last Modified</th>
                                     <th>Custom Time</th>
+                                    <th>Manifest ID</th>
                                 </tr>
                             </thead>
                             <tbody id="objects-tbody">

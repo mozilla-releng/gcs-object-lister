@@ -92,11 +92,20 @@ class APIClient {
         if (options.sort) params.append('sort', options.sort);
         if (options.created_before) params.append('created_before', options.created_before);
         if (options.has_custom_time) params.append('has_custom_time', options.has_custom_time);
+        if (options.matches_manifest) params.append('matches_manifest', options.matches_manifest);
 
         const query = params.toString();
         const endpoint = `/fetches/${dbName}/objects${query ? '?' + query : ''}`;
-        
+
+        // Debug logging for API call
+        console.log('API getObjects - Full URL:', endpoint);
+
         return this.request('GET', endpoint);
+    }
+
+    // Get manifest entries
+    async getManifestEntries(dbName) {
+        return this.request('GET', `/manifest/entries/${dbName}`);
     }
 
     // Download object list
@@ -116,6 +125,7 @@ class APIClient {
         }
         if (options.created_before) params.append('created_before', options.created_before);
         if (options.has_custom_time) params.append('has_custom_time', options.has_custom_time);
+        if (options.matches_manifest) params.append('matches_manifest', options.matches_manifest);
 
         const query = params.toString();
         const endpoint = `/fetches/${dbName}/download${query ? '?' + query : ''}`;

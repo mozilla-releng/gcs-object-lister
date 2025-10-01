@@ -9,15 +9,17 @@ let currentFilters = [];
 let currentSort = 'name_asc';
 let currentCreatedBefore = '';
 let currentHasCustomTime = '';
-let currentManifestPatterns = [];
+let currentMatchesManifest = '';
 let totalObjects = 0;
 let dbName = '';
 
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
     dbName = getDbNameFromPath();
+    console.log('Initialized dbName:', dbName, 'from path:', window.location.pathname);
     setupEventListeners();
     loadFetchInfo();
+    loadManifestStatus();
     loadObjects();
 });
 
@@ -37,6 +39,7 @@ function setupEventListeners() {
 
     // Make manifest filter functions global
     window.loadManifest = loadManifest;
+    window.recalculateManifest = recalculateManifest;
     window.clearManifest = clearManifest;
     
     // Initialize filter UI
@@ -92,6 +95,7 @@ async function handleSearchSubmit(event) {
     const sort = formData.get('sort');
     const createdBefore = formData.get('created_before');
     const hasCustomTime = formData.get('has_custom_time');
+    const matchesManifest = formData.get('matches_manifest');
     
     // Collect all regex filters
     const regexInputs = document.querySelectorAll('.regex-filter');
@@ -137,7 +141,11 @@ async function handleSearchSubmit(event) {
     }
     
     currentHasCustomTime = hasCustomTime;
+    currentMatchesManifest = matchesManifest;
     currentPage = 1; // Reset to first page
+
+    // Debug logging for manifest filter
+    console.log('Form submitted - matchesManifest:', matchesManifest, 'type:', typeof matchesManifest);
     
     await loadObjects();
 }
@@ -163,10 +171,6 @@ async function loadObjects() {
             options.regex_filters = currentFilters;
         }
 
-        if (currentManifestPatterns.length > 0) {
-            options.manifest_patterns = currentManifestPatterns;
-        }
-
         if (currentCreatedBefore) {
             options.created_before = currentCreatedBefore;
         }
@@ -174,7 +178,14 @@ async function loadObjects() {
         if (currentHasCustomTime) {
             options.has_custom_time = currentHasCustomTime;
         }
-        
+
+        if (currentMatchesManifest !== '') {
+            options.matches_manifest = currentMatchesManifest;
+        }
+
+        // Debug logging for API call
+        console.log('Calling API with options:', JSON.stringify(options, null, 2));
+
         const result = await api.getObjects(dbName, options);
         
         // Hide loading
@@ -217,14 +228,28 @@ function displayObjects(result) {
 
 function createObjectRow(obj) {
     const row = document.createElement('tr');
-    
+
+    // Format manifest entry ID with debugging
+    let manifestDisplay = '';
+    if (obj.manifest_entry_id !== null && obj.manifest_entry_id !== undefined) {
+        manifestDisplay = `<span class="manifest-id">${obj.manifest_entry_id}</span>`;
+    } else {
+        manifestDisplay = '<span class="no-manifest">-</span>';
+    }
+
+    // Add debug logging for first few rows
+    if (window.debugManifestIds) {
+        console.log('Object:', obj.name, 'manifest_entry_id:', obj.manifest_entry_id, 'type:', typeof obj.manifest_entry_id);
+    }
+
     row.innerHTML = `
         <td style="word-break: break-all;">${escapeHtml(obj.name)}</td>
         <td>${formatBytes(obj.size)}</td>
         <td>${formatDate(obj.updated)}</td>
         <td>${formatDate(obj.custom_time)}</td>
+        <td>${manifestDisplay}</td>
     `;
-    
+
     return row;
 }
 
@@ -280,14 +305,14 @@ async function downloadList() {
         if (currentFilters.length > 0) {
             options.regex_filters = currentFilters;
         }
-        if (currentManifestPatterns.length > 0) {
-            options.manifest_patterns = currentManifestPatterns;
-        }
         if (currentCreatedBefore) {
             options.created_before = currentCreatedBefore;
         }
         if (currentHasCustomTime) {
             options.has_custom_time = currentHasCustomTime;
+        }
+        if (currentMatchesManifest !== '') {
+            options.matches_manifest = currentMatchesManifest;
         }
         
         const response = await api.downloadObjectList(dbName, options);
@@ -402,6 +427,64 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+async function loadManifestStatus() {
+    try {
+        const response = await fetch(`/api/manifest/status/${dbName}`);
+        const data = await response.json();
+
+        const statusDiv = document.getElementById('manifest-status');
+        const statusText = document.getElementById('manifest-status-text');
+
+        if (response.ok && data.has_manifest) {
+            // Show current manifest info
+            statusDiv.classList.remove('hidden');
+
+            // Display status with appropriate styling
+            const status = data.status || 'idle';
+            let statusMessage = `Manifest loaded: ${data.pattern_count} patterns from ${data.url} (added ${formatDate(data.date_added)})`;
+
+            if (status === 'processing') {
+                statusMessage += ' - Processing object links...';
+                statusText.className = 'manifest-processing';
+                // Schedule another status check in 10 seconds if processing
+                setTimeout(() => loadManifestStatus(), 10000);
+            } else {
+                statusText.className = 'manifest-success';
+            }
+
+            statusText.textContent = statusMessage;
+            statusText.style.cursor = 'pointer';
+            statusText.title = 'Click to view manifest entries';
+
+            // Add click handler to expand/collapse manifest entries
+            statusText.onclick = () => toggleManifestEntries();
+
+            // Show action buttons (but disable recalculate if processing)
+            document.getElementById('recalculate-manifest-btn').classList.remove('hidden');
+            document.getElementById('clear-manifest-btn').classList.remove('hidden');
+
+            const recalculateBtn = document.getElementById('recalculate-manifest-btn');
+            if (status === 'processing') {
+                recalculateBtn.disabled = true;
+                recalculateBtn.textContent = 'Processing...';
+            } else {
+                recalculateBtn.disabled = false;
+                recalculateBtn.textContent = 'Recalculate Matches';
+            }
+
+            // Set URL in input
+            document.getElementById('manifest-url').value = data.url;
+        } else {
+            // No manifest loaded
+            statusDiv.classList.add('hidden');
+            document.getElementById('recalculate-manifest-btn').classList.add('hidden');
+            document.getElementById('clear-manifest-btn').classList.add('hidden');
+        }
+    } catch (error) {
+        console.warn('Failed to load manifest status:', error);
+    }
+}
+
 async function loadManifest() {
     const manifestUrlInput = document.getElementById('manifest-url');
     const loadBtn = document.getElementById('load-manifest-btn');
@@ -415,6 +498,11 @@ async function loadManifest() {
         return;
     }
 
+    if (!dbName || dbName === '') {
+        showMessage('error', 'Database name not found. Please ensure you are accessing this page from a valid fetch URL (e.g., /your_database_name).');
+        return;
+    }
+
     const originalText = loadBtn.textContent;
 
     try {
@@ -422,10 +510,12 @@ async function loadManifest() {
         loadBtn.textContent = 'Loading...';
         statusDiv.classList.add('hidden');
 
+        console.log('Loading manifest with URL:', manifestUrl, 'and dbName:', dbName);
+
         const response = await fetch('/api/manifest/parse', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: manifestUrl })
+            body: JSON.stringify({ url: manifestUrl, db_name: dbName })
         });
 
         const data = await response.json();
@@ -435,24 +525,26 @@ async function loadManifest() {
         }
 
         if (data.patterns) {
-            currentManifestPatterns = data.patterns;
-
-            // Show success status
+            // Show success status with linking information
             statusDiv.classList.remove('hidden');
-            statusText.textContent = data.message;
+            let message = data.message;
+            if (data.linking_stats) {
+                message += ` (linked ${data.linking_stats.linked_objects}/${data.linking_stats.total_objects} objects)`;
+            }
+            statusText.textContent = message;
             statusText.className = 'manifest-success';
 
             // Show and populate patterns list
             displayManifestPatterns(data.patterns);
 
-            // Show clear button
+            // Show action buttons
+            document.getElementById('recalculate-manifest-btn').classList.remove('hidden');
             clearBtn.classList.remove('hidden');
 
-            // Reload objects with manifest filters
-            currentPage = 1;
-            loadObjects();
-
-            showMessage('success', `Manifest loaded with ${data.patterns.length} patterns`);
+            // Don't automatically reload objects - let user choose manifest filtering
+            const linkInfo = data.linking_stats ?
+                ` and linked ${data.linking_stats.linked_objects} objects` : '';
+            showMessage('success', `Manifest loaded with ${data.patterns.length} patterns${linkInfo}. Use "Matches Manifest" filter to view linked objects.`);
         } else {
             throw new Error(data.details || 'Failed to parse manifest');
         }
@@ -468,20 +560,159 @@ async function loadManifest() {
     }
 }
 
-function clearManifest() {
-    currentManifestPatterns = [];
+async function toggleManifestEntries() {
+    const entriesDiv = document.getElementById('manifest-entries');
 
-    // Clear UI
-    document.getElementById('manifest-url').value = '';
-    document.getElementById('manifest-status').classList.add('hidden');
-    document.getElementById('manifest-patterns').classList.add('hidden');
-    document.getElementById('clear-manifest-btn').classList.add('hidden');
+    if (!entriesDiv) {
+        console.error('Manifest entries container not found');
+        return;
+    }
 
-    // Reload objects without manifest filters
-    currentPage = 1;
-    loadObjects();
+    // If already visible, hide it
+    if (!entriesDiv.classList.contains('hidden')) {
+        entriesDiv.classList.add('hidden');
+        return;
+    }
 
-    showMessage('success', 'Manifest filter cleared');
+    // Show loading state
+    entriesDiv.innerHTML = '<p>Loading manifest entries...</p>';
+    entriesDiv.classList.remove('hidden');
+
+    try {
+        const api = new APIClient();
+        const response = await api.getManifestEntries(dbName);
+
+        if (!response.success) {
+            throw new Error(response.details || 'Failed to load manifest entries');
+        }
+
+        displayManifestEntries(response.entries);
+    } catch (error) {
+        entriesDiv.innerHTML = `<p class="error">Failed to load manifest entries: ${error.message}</p>`;
+        console.error('Failed to load manifest entries:', error);
+    }
+}
+
+function displayManifestEntries(entries) {
+    const entriesDiv = document.getElementById('manifest-entries');
+
+    if (!entries || entries.length === 0) {
+        entriesDiv.innerHTML = '<p>No manifest entries found.</p>';
+        return;
+    }
+
+    let html = `
+        <div class="manifest-entries-header">
+            <h4>Manifest Entries (${entries.length})</h4>
+            <button type="button" onclick="toggleManifestEntries()" class="close-btn">&times;</button>
+        </div>
+        <div class="manifest-entries-list">
+    `;
+
+    entries.forEach((entry, index) => {
+        html += `
+            <div class="manifest-entry">
+                <div class="entry-header">
+                    <span class="entry-id">#${entry.id}</span>
+                    <span class="entry-name">${escapeHtml(entry.pretty_name || 'Unnamed Pattern')}</span>
+                </div>
+                <div class="entry-pattern">
+                    <code>${escapeHtml(entry.regex_pattern)}</code>
+                </div>
+            </div>
+        `;
+    });
+
+    html += '</div>';
+    entriesDiv.innerHTML = html;
+}
+
+async function recalculateManifest() {
+    const recalculateBtn = document.getElementById('recalculate-manifest-btn');
+    const originalText = recalculateBtn.textContent;
+
+    if (!dbName || dbName === '') {
+        showMessage('error', 'Database name not found. Please refresh the page.');
+        return;
+    }
+
+    try {
+        recalculateBtn.disabled = true;
+        recalculateBtn.textContent = 'Recalculating...';
+
+        const response = await fetch(`/api/manifest/recalculate/${dbName}`, {
+            method: 'POST'
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.details || `HTTP ${response.status}`);
+        }
+
+        // Immediately update status to reflect any processing state
+        loadManifestStatus();
+
+        // Update status display
+        const statusDiv = document.getElementById('manifest-status');
+        const statusText = document.getElementById('manifest-status-text');
+
+        if (data.linking_stats) {
+            const currentText = statusText.textContent;
+            // Update the linking stats in the status text
+            const baseText = currentText.split(' (linked')[0];
+            statusText.textContent = `${baseText} (linked ${data.linking_stats.linked_objects}/${data.linking_stats.total_objects} objects)`;
+        }
+
+        // Reload objects to show updated manifest IDs
+        currentPage = 1;
+        loadObjects();
+
+        const linkInfo = data.linking_stats ?
+            `Recalculated links: ${data.linking_stats.linked_objects}/${data.linking_stats.total_objects} objects matched` :
+            'Manifest matches recalculated';
+        showMessage('success', linkInfo);
+
+    } catch (error) {
+        showMessage('error', `Failed to recalculate manifest: ${error.message || error.details}`);
+    } finally {
+        recalculateBtn.disabled = false;
+        recalculateBtn.textContent = originalText;
+    }
+}
+
+async function clearManifest() {
+    try {
+        const response = await fetch(`/api/manifest/clear/${dbName}`, {
+            method: 'POST'
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.details || `HTTP ${response.status}`);
+        }
+
+        // Clear UI
+        document.getElementById('manifest-url').value = '';
+        document.getElementById('manifest-status').classList.add('hidden');
+        document.getElementById('manifest-entries').classList.add('hidden');
+        document.getElementById('manifest-patterns').classList.add('hidden');
+        document.getElementById('recalculate-manifest-btn').classList.add('hidden');
+        document.getElementById('clear-manifest-btn').classList.add('hidden');
+
+        // Reset manifest filter dropdown
+        document.getElementById('matches_manifest').value = '';
+        currentMatchesManifest = '';
+
+        // Reload objects without manifest filters
+        currentPage = 1;
+        loadObjects();
+
+        showMessage('success', 'Manifest cleared successfully');
+    } catch (error) {
+        showMessage('error', `Failed to clear manifest: ${error.message || error.details}`);
+    }
 }
 
 function displayManifestPatterns(patterns) {

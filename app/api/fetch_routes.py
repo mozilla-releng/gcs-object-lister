@@ -128,24 +128,30 @@ def create_fetch_routes(fetch_manager):
         # Parse query parameters
         regex_filter = request.args.get('regex')  # Single regex (backward compatibility)
         regex_filters = request.args.getlist('regex_filters[]')  # Multiple regex patterns
-        manifest_patterns = request.args.getlist('manifest_patterns[]')  # Manifest-based patterns
         created_before = request.args.get('created_before')
         has_custom_time = request.args.get('has_custom_time')
+        matches_manifest = request.args.get('matches_manifest')  # Manifest filtering
         page = int(request.args.get('page', 1))
         page_size = min(int(request.args.get('page_size', 200)), 1000)
         sort = request.args.get('sort', 'name_asc')
 
-        # Combine all regex patterns (custom + manifest)
+        # Combine all regex patterns
         all_regex_filters = []
         if regex_filter:
             all_regex_filters.append(regex_filter)
         if regex_filters:
             all_regex_filters.extend([f for f in regex_filters if f])
-        if manifest_patterns:
-            all_regex_filters.extend([f for f in manifest_patterns if f])
 
         # Optimize patterns by combining them if there are too many
         all_regex_filters = optimize_regex_patterns(all_regex_filters)
+
+        # Determine manifest filtering strategy
+        use_manifest_filtering = False
+        exclude_manifest_matches = False
+        if matches_manifest == 'true':
+            use_manifest_filtering = True
+        elif matches_manifest == 'false':
+            exclude_manifest_matches = True
 
         # Log pattern count for debugging
         if all_regex_filters:
@@ -170,16 +176,6 @@ def create_fetch_routes(fetch_manager):
                             400
                         )
 
-        # Validate manifest patterns (they should already be valid regex)
-        if manifest_patterns:
-            for i, pattern in enumerate(manifest_patterns):
-                if pattern:  # Skip empty patterns
-                    error_msg = validate_regex(pattern)
-                    if error_msg:
-                        return orjson_response(
-                            {"error": "invalid_regex", "details": f"Manifest pattern {i+1}: {error_msg}"},
-                            400
-                        )
 
         # Validate date parameter if provided
         if created_before:
@@ -205,7 +201,7 @@ def create_fetch_routes(fetch_manager):
 
         try:
             result = fetch_manager.db_manager.get_objects_page(
-                db_name, page, page_size, regex_filter, sort, created_before, has_custom_time, all_regex_filters
+                db_name, page, page_size, regex_filter, sort, created_before, has_custom_time, all_regex_filters, use_manifest_filtering, exclude_manifest_matches
             )
             return orjson_response(result)
         except Exception as e:
@@ -232,21 +228,27 @@ def create_fetch_routes(fetch_manager):
         # Parse query parameters
         regex_filter = request.args.get('regex')  # Single regex (backward compatibility)
         regex_filters = request.args.getlist('regex_filters[]')  # Multiple regex patterns
-        manifest_patterns = request.args.getlist('manifest_patterns[]')  # Manifest-based patterns
         created_before = request.args.get('created_before')
         has_custom_time = request.args.get('has_custom_time')
+        matches_manifest = request.args.get('matches_manifest')  # Manifest filtering
 
-        # Combine all regex patterns (custom + manifest)
+        # Combine all regex patterns
         all_regex_filters = []
         if regex_filter:
             all_regex_filters.append(regex_filter)
         if regex_filters:
             all_regex_filters.extend([f for f in regex_filters if f])
-        if manifest_patterns:
-            all_regex_filters.extend([f for f in manifest_patterns if f])
 
         # Optimize patterns by combining them if there are too many
         all_regex_filters = optimize_regex_patterns(all_regex_filters)
+
+        # Determine manifest filtering strategy
+        use_manifest_filtering = False
+        exclude_manifest_matches = False
+        if matches_manifest == 'true':
+            use_manifest_filtering = True
+        elif matches_manifest == 'false':
+            exclude_manifest_matches = True
 
         # Validate regex patterns
         if regex_filter:
@@ -267,16 +269,6 @@ def create_fetch_routes(fetch_manager):
                             400
                         )
 
-        # Validate manifest patterns (they should already be valid regex)
-        if manifest_patterns:
-            for i, pattern in enumerate(manifest_patterns):
-                if pattern:  # Skip empty patterns
-                    error_msg = validate_regex(pattern)
-                    if error_msg:
-                        return orjson_response(
-                            {"error": "invalid_regex", "details": f"Manifest pattern {i+1}: {error_msg}"},
-                            400
-                        )
 
         # Validate date parameter if provided
         if created_before:
@@ -298,7 +290,7 @@ def create_fetch_routes(fetch_manager):
 
         try:
             object_names = fetch_manager.db_manager.get_object_names_filtered(
-                db_name, regex_filter, created_before, has_custom_time, all_regex_filters
+                db_name, regex_filter, created_before, has_custom_time, all_regex_filters, use_manifest_filtering, exclude_manifest_matches
             )
 
             # Create text content

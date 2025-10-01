@@ -34,7 +34,40 @@ External dependencies loaded via CDN:
 
 - **URL Input**: Users can enter Firefox manifest URLs for automatic pattern generation
 - **Status Display**: Real-time feedback during manifest loading with success/error states
-- **Pattern Combination**: Seamlessly combines manifest patterns with custom regex filters
+- **Database-Level Filtering**: "Matches Manifest" dropdown for fast filtering using pre-computed links
+- **Object ID Display**: Shows manifest entry IDs for each matched object in the table
+- **Recalculation**: Real-time manifest match recalculation without re-fetching objects
 - **Clear Functionality**: Easy manifest clearing and filter management
+
+## Manifest Filtering UI Components
+
+### Custom Filtering Section
+- **Matches Manifest Dropdown**: Three-state filter (All Files/Matches Manifest/Does Not Match Manifest)
+- **Performance Optimization**: Uses database JOINs instead of runtime regex pattern matching
+- **State Management**: Tracks filtering state independently from manifest pattern loading
+
+### Enhanced Object Table
+- **Manifest ID Column**: Displays manifest_entry_id for matched objects with visual styling
+- **Conditional Display**: Shows numeric IDs for matches, dash (-) for non-matches
+- **CSS Styling**: `.manifest-id` class for positive matches, `.no-manifest` for empty states
+
+### Manifest Management Controls
+- **Load Button**: Fetches and parses manifest from URL with template variable processing
+- **Recalculate Button**: Re-runs object linking algorithm without re-fetching objects
+- **Clear Button**: Removes manifest data and resets filtering state
+- **Status Feedback**: Real-time loading states and error handling
+
+## Frontend Architecture Evolution
+
+### Phase 1: Runtime Pattern Matching
+- Frontend received manifest patterns from API
+- Client-side filtering using JavaScript regex
+- Performance bottleneck with large object lists
+
+### Phase 2: Database-Level Filtering (Current)
+- Backend pre-computes object-to-manifest-entry links
+- Frontend sends filter parameters to API
+- Fast server-side JOIN operations for filtering
+- Manifest IDs displayed for debugging and transparency
 
 All JavaScript uses modern ES6+ features and module imports for clean separation of concerns.
