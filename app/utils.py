@@ -1,4 +1,4 @@
-"""Utility functions for the GCS Storage Manager."""
+"""Utility functions for the GCS Object Lister."""
 
 import re
 from datetime import datetime

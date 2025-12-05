@@ -1,4 +1,4 @@
-# GCS Storage Manager
+# GCS Object Lister
 
 Local-only web application for managing and exploring Google Cloud Storage artifacts. Built with Python Flask backend and vanilla JavaScript frontend, containerized with Docker.
 

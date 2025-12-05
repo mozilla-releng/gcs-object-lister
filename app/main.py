@@ -91,7 +91,7 @@ def main():
     host = app.config['APP_HOST']
     port = app.config['APP_PORT']
 
-    logger.info(f"Starting GCS Storage Manager on {host}:{port}")
+    logger.info(f"Starting GCS Object Lister on {host}:{port}")
 
     if app.config['GCP_PROJECT']:
         logger.info(f"GCP Project: {app.config['GCP_PROJECT']}")

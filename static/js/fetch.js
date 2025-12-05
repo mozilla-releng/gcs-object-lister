@@ -1,4 +1,4 @@
-// Fetch view page logic for GCS Storage Manager
+// Fetch view page logic for GCS Object Lister
 
 import { APIClient, APIError, showMessage, clearMessages, formatDate, formatBytes, getDbNameFromPath } from './api.js';
 

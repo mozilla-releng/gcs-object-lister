@@ -1,4 +1,4 @@
-// API client utilities for GCS Storage Manager
+// API client utilities for GCS Object Lister
 
 class APIClient {
     constructor(baseURL = '/api') {

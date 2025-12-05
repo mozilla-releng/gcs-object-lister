@@ -1,6 +1,6 @@
 # Backend Application Directory
 
-This directory contains the Python Flask backend for the GCS Storage Manager.
+This directory contains the Python Flask backend for the GCS Object Lister.
 
 ## Structure
 

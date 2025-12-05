@@ -1,6 +1,6 @@
 # Static Assets Directory
 
-This directory contains all frontend assets for the GCS Storage Manager web application.
+This directory contains all frontend assets for the GCS Object Lister web application.
 
 ## Structure
 

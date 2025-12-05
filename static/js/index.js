@@ -1,4 +1,4 @@
-// Main page logic for GCS Storage Manager
+// Main page logic for GCS Object Lister
 
 import { APIClient, APIError, showMessage, clearMessages, formatDate, formatBytes } from './api.js';
 

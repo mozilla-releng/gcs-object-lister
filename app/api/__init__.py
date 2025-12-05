@@ -1,4 +1,4 @@
-"""API module for the GCS Storage Manager."""
+"""API module for the GCS Object Lister."""
 
 from .routes import create_api
 

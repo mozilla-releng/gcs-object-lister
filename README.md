@@ -1,4 +1,4 @@
-# GCS Storage Manager
+# GCS Object Lister
 
 A local-only web application for managing and exploring artifacts in Google Cloud Storage (GCS) buckets. This tool allows you to fetch object listings from GCS buckets, store them locally in SQLite databases, and explore them through a web interface.
 
