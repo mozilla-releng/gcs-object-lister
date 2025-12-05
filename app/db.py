@@ -273,20 +273,21 @@ class DatabaseManager:
             # Filter out objects that match manifest
             from_clause = "objects"
             where_conditions.append("manifest_entry_id IS NULL")
-        else:
-            # Handle regex filters with OR logic (slower REGEXP approach)
-            all_regex_patterns = []
-            if regex_filter:
-                all_regex_patterns.append(regex_filter)
-            if regex_filters:
-                all_regex_patterns.extend([f for f in regex_filters if f])
 
-            if all_regex_patterns:
-                regex_conditions = []
-                for pattern in all_regex_patterns:
-                    regex_conditions.append("name REGEXP ?")
-                    params.append(pattern)
-                where_conditions.append(f"({' OR '.join(regex_conditions)})")
+        # Handle regex filters with OR logic - apply regardless of manifest strategy
+        all_regex_patterns = []
+        if regex_filter:
+            all_regex_patterns.append(regex_filter)
+        if regex_filters:
+            all_regex_patterns.extend([f for f in regex_filters if f])
+
+        if all_regex_patterns:
+            regex_conditions = []
+            table_prefix = "o." if use_manifest_filtering else ""
+            for pattern in all_regex_patterns:
+                regex_conditions.append(f"{table_prefix}name REGEXP ?")
+                params.append(pattern)
+            where_conditions.append(f"({' OR '.join(regex_conditions)})")
 
         # Date filter (created before)
         if created_before:
@@ -389,20 +390,21 @@ class DatabaseManager:
             # Filter out objects that match manifest
             from_clause = "objects"
             where_conditions.append("manifest_entry_id IS NULL")
-        else:
-            # Handle regex filters with OR logic (slower REGEXP approach)
-            all_regex_patterns = []
-            if regex_filter:
-                all_regex_patterns.append(regex_filter)
-            if regex_filters:
-                all_regex_patterns.extend([f for f in regex_filters if f])
 
-            if all_regex_patterns:
-                regex_conditions = []
-                for pattern in all_regex_patterns:
-                    regex_conditions.append("name REGEXP ?")
-                    params.append(pattern)
-                where_conditions.append(f"({' OR '.join(regex_conditions)})")
+        # Handle regex filters with OR logic - apply regardless of manifest strategy
+        all_regex_patterns = []
+        if regex_filter:
+            all_regex_patterns.append(regex_filter)
+        if regex_filters:
+            all_regex_patterns.extend([f for f in regex_filters if f])
+
+        if all_regex_patterns:
+            regex_conditions = []
+            table_prefix = "o." if use_manifest_filtering else ""
+            for pattern in all_regex_patterns:
+                regex_conditions.append(f"{table_prefix}name REGEXP ?")
+                params.append(pattern)
+            where_conditions.append(f"({' OR '.join(regex_conditions)})")
 
         # Date filter (created before) - adjust for table alias
         table_prefix = "o." if use_manifest_filtering else ""

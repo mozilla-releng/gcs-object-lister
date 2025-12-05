@@ -245,7 +245,7 @@ function createObjectRow(obj) {
     row.innerHTML = `
         <td style="word-break: break-all;">${escapeHtml(obj.name)}</td>
         <td>${formatBytes(obj.size)}</td>
-        <td>${formatDate(obj.updated)}</td>
+        <td>${formatDate(obj.time_created)}</td>
         <td>${formatDate(obj.custom_time)}</td>
         <td>${manifestDisplay}</td>
     `;
