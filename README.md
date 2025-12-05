@@ -2,6 +2,10 @@
 
 A local-only web application for managing and exploring artifacts in Google Cloud Storage (GCS) buckets. This tool allows you to fetch object listings from GCS buckets, store them locally in SQLite databases, and explore them through a web interface.
 
+## Purpose
+
+This project was created to list and filter files in the `archive.m.o` GCP bucket. The gcloud/gsutil tools don't provide an easy way to filter currently available files - the BigQuery data export includes soft-deleted files, but we needed access to only the available files currently in the bucket.
+
 ## Features
 
 - **Fetch GCS objects**: Asynchronously fetch complete object listings from GCS buckets
